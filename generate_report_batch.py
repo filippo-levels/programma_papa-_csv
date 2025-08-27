@@ -409,42 +409,26 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
         
         story.append(table)
     
-    # Genera PDF principale
-    try:
-        doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
-        print(f"PDF principale generato con successo")
-        
         # Aggiungi grafico delle temperature se disponibile
         if HAS_MATPLOTLIB and len(df) > 0:
             chart_buffer = create_temperature_chart(df)
             if chart_buffer:
-                # Crea documento landscape per il grafico
-                chart_output = output_path.replace('.pdf', '_temperature_trend.pdf')
-                chart_doc = SimpleDocTemplate(
-                    chart_output,
-                    pagesize=landscape(A4),
-                    leftMargin=1.5*cm,
-                    rightMargin=1.5*cm,
-                    topMargin=1*cm,
-                    bottomMargin=1*cm
-                )
+                # Aggiungi pagina nuova per il grafico
+                story.append(PageBreak())
                 
-                chart_story = []
+                # Titolo per la sezione grafico
+                chart_title = Paragraph("Temperature Trend Over Time", title_style)
+                story.append(chart_title)
+                story.append(Spacer(1, 12))
                 
-                # Header con logo e titolo per la pagina temperature trend
-                chart_title = f"{Path(source_filename).stem} - Temperature Trend"
-                chart_header = create_logo_header(logo_path, chart_title, title_style)
-                chart_story.append(chart_header)
-                chart_story.append(Spacer(1, 12))
-                
-                # Aggiungi il grafico temperature trend (dimensioni ottimizzate per landscape - allargato)
-                chart_image = Image(chart_buffer, width=26*cm, height=15*cm)
-                chart_story.append(chart_image)
-                
-                # Genera PDF temperature trend (senza numerazione pagine)
-                chart_doc.build(chart_story)
-                print(f"PDF temperature trend generato: {chart_output}")
-        
+                # Aggiungi il grafico temperature trend (dimensioni ottimizzate per portrait)
+                chart_image = Image(chart_buffer, width=16*cm, height=10*cm)
+                story.append(chart_image)
+    
+    # Genera PDF principale
+    try:
+        doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
+        print(f"PDF principale generato con successo")
         return True
     except Exception as e:
         print(f"ERRORE durante generazione PDF: {e}", file=sys.stderr)
