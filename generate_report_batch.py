@@ -479,33 +479,58 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
     
     # Genera PDF principale
     try:
+        # Prima, determiniamo quante pagine ci saranno
+        # Creiamo un PDF temporaneo solo per contare le pagine
+        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+        temp_pdf_path = temp_pdf.name
+        temp_pdf.close()
+        
+        temp_doc = SimpleDocTemplate(
+            temp_pdf_path,
+            pagesize=A4,
+            leftMargin=2*cm,
+            rightMargin=2*cm,
+            topMargin=1.5*cm,
+            bottomMargin=1.5*cm
+        )
+        
+        # Conta le pagine senza numerarle
+        page_count = [0]
+        def count_pages(canvas, doc):
+            page_count[0] = canvas.getPageNumber()
+        
+        temp_doc.build(story, onFirstPage=count_pages, onLaterPages=count_pages)
+        total_pages = page_count[0]
+        
+        # Rimuovi il PDF temporaneo
+        try:
+            os.unlink(temp_pdf_path)
+        except:
+            pass
+        
+        # Ora genera il PDF finale con la numerazione corretta
         # Callback per gestire la numerazione delle pagine
-        # Usiamo una classe per tracciare il numero totale di pagine
         class PageNumberHandler:
             """Handler per numerare le pagine correttamente."""
-            def __init__(self, has_chart):
+            def __init__(self, has_chart, total_pages):
                 self.has_chart = has_chart
-                self.total_pages = None
+                self.total_pages = total_pages
             
             def on_page(self, canvas, doc):
                 page_num = canvas.getPageNumber()
                 
-                # Calcola il numero totale di pagine al primo passaggio
-                if self.total_pages is None:
-                    # Durante il primo build, non sappiamo ancora il totale
-                    # Useremo un secondo passaggio per questo
-                    pass
-                
                 # Se c'è un grafico e siamo sull'ultima pagina
-                if self.has_chart and page_num > 1:
+                is_last_page = self.has_chart and page_num == self.total_pages
+                
+                if is_last_page:
                     # L'ultima pagina (con il grafico) ha solo il numero ruotato
                     add_page_number_rotated(canvas, doc)
                 else:
                     # Tutte le altre pagine hanno "Page N"
                     add_page_number(canvas, doc, show_page_text=True)
         
-        # Genera PDF
-        handler = PageNumberHandler(has_chart)
+        # Genera PDF finale
+        handler = PageNumberHandler(has_chart, total_pages)
         doc.build(story, onFirstPage=handler.on_page, onLaterPages=handler.on_page)
         
         print(f"PDF principale generato con successo")
