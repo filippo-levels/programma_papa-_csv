@@ -35,11 +35,35 @@ jobs:
         pyinstaller --onefile --windowed --version-file version_info.txt --uac-admin --clean --name print_latest_pdf print_latest_pdf.py
         pyinstaller --onefile --windowed --version-file version_info.txt --uac-admin --clean --name print_latest_pdf_from_recent_folder print_latest_pdf_from_recent_folder.py
     
-    - name: Upload artifacts
+    - name: Upload generate_report_batch.exe
       uses: actions/upload-artifact@v4
       with:
-        name: windows-executables-${{ github.ref_name }}
-        path: dist/*.exe
+        name: generate_report_batch-${{ github.ref_name }}
+        path: dist/generate_report_batch.exe
+    
+    - name: Upload generate_report_alarm.exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: generate_report_alarm-${{ github.ref_name }}
+        path: dist/generate_report_alarm.exe
+    
+    - name: Upload generate_report_operlog.exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: generate_report_operlog-${{ github.ref_name }}
+        path: dist/generate_report_operlog.exe
+    
+    - name: Upload print_latest_pdf.exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: print_latest_pdf-${{ github.ref_name }}
+        path: dist/print_latest_pdf.exe
+    
+    - name: Upload print_latest_pdf_from_recent_folder.exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: print_latest_pdf_from_recent_folder-${{ github.ref_name }}
+        path: dist/print_latest_pdf_from_recent_folder.exe
     
     - name: Display build info
       run: |
