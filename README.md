@@ -46,6 +46,7 @@ Genera report PDF da file CSV contenenti dati di batch con grafico delle tempera
 - Calcola e mostra il periodo di inizio-fine
 - Genera grafico lineare delle temperature (richiede matplotlib)
 - Include sottotitolo con range temporale
+- **Grafico in orientamento landscape**: L'ultima pagina con il grafico è in formato orizzontale per sfruttare meglio lo spazio disponibile
 
 **Uso**:
 ```bash
@@ -64,7 +65,8 @@ python generate_report_batch.py [--csv <file>] [--out <pdf>] [--logo <logo>] [--
 
 ## Caratteristiche PDF
 
-- Formato A4 verticale
+- Formato A4 verticale (portrait) per le pagine dati
+- **Formato A4 orizzontale (landscape)** per la pagina del grafico temperature (solo `generate_report_batch.py`)
 - Logo in alto a sinistra (se presente)
 - Titolo centrato basato sul nome del file
 - Numerazione pagine in basso a destra
@@ -127,7 +129,11 @@ I PDF generati includono:
 4. **Contenuto principale**: Tabella dati o grafico + tabella
 5. **Footer**: Numerazione pagine
 
-I file PDF vengono salvati nella stessa directory dello script con nome `<basename_input>_report.pdf`.
+**Posizione file PDF:**
+- `generate_report_alarm.py` e `generate_report_batch.py`: I PDF vengono salvati nella sottocartella `PDF/` (creata automaticamente se non esiste) nella directory corrente
+- `generate_report_operlog.py`: I PDF vengono salvati nella stessa directory del file CSV sorgente (cartella DDMMYY più recente)
+
+**Nome file**: `<basename_input>_report.pdf`
 
 ## Nuovo: Stampa Automatica PDF
 
@@ -135,10 +141,11 @@ I file PDF vengono salvati nella stessa directory dello script con nome `<basena
 Script per stampare automaticamente il PDF più recente nella cartella corrente.
 
 **Funzionalità:**
-- Cerca automaticamente il file PDF più recente
+- Cerca automaticamente il file PDF più recente nella directory corrente
 - Lo invia direttamente alla stampante predefinita
 - Zero configurazione richiesta
 - Ottimizzato per ridurre falsi positivi antivirus
+- **Sistema di logging completo**: Genera file di log con dettagli dell'operazione nella directory corrente
 
 **Uso:**
 ```bash
@@ -154,6 +161,15 @@ python build_optimized.py
 - Richiesta privilegi amministratore
 - Build pulito senza cache
 - Riduce falsi positivi del 60-80%
+
+### `print_latest_pdf_from_recent_folder.py` - Stampa da Cartella Recente
+Script per stampare il PDF più recente nella cartella DDMMYY più recente.
+
+**Funzionalità:**
+- Cerca automaticamente la cartella con formato DDMMYY più recente
+- Trova il PDF più recente all'interno di quella cartella
+- Lo invia direttamente alla stampante predefinita
+- **Sistema di logging completo**: Genera file di log nella cartella più recente selezionata
 
 ## Miglioramenti Implementati
 
@@ -191,3 +207,46 @@ Il script `generate_report_batch.py` supporta la generazione di **due PDF separa
 python generate_report_batch.py --separate-files --logo logo.png
 # Genera: BATCH120725155609_chart.pdf + BATCH120725155609_report.pdf
 ```
+
+## Sistema di Logging
+
+Tutti gli script generano file di log dettagliati per tracciare le operazioni e facilitare il debug.
+
+### Formato Log
+I file di log utilizzano il formato standard:
+```
+%(asctime)s - %(levelname)s - %(message)s
+```
+
+Esempio:
+```
+2025-01-15 14:30:25,123 - INFO - === AVVIO GENERAZIONE REPORT BATCH ===
+2025-01-15 14:30:25,456 - INFO - Directory di lavoro: /path/to/directory
+2025-01-15 14:30:26,789 - INFO - File CSV selezionato: BATCH120725155609.csv
+```
+
+### Posizione File di Log
+
+**Script di generazione report:**
+- `generate_report_alarm.py`: File di log salvato in `PDF/alarm_report_log_YYYYMMDD_HHMMSS.log`
+- `generate_report_batch.py`: File di log salvato in `PDF/batch_report_log_YYYYMMDD_HHMMSS.log`
+- `generate_report_operlog.py`: File di log salvato nella cartella DDMMYY più recente come `operlog_report_log_YYYYMMDD_HHMMSS.log`
+
+**Script di stampa:**
+- `print_latest_pdf.py`: File di log salvato nella directory corrente come `pdf_print_log_YYYYMMDD_HHMMSS.log`
+- `print_latest_pdf_from_recent_folder.py`: File di log salvato nella cartella DDMMYY più recente come `pdf_print_log_YYYYMMDD_HHMMSS.log`
+
+### Livelli di Log
+- **DEBUG**: Informazioni dettagliate per il debug (solo nel file di log)
+- **INFO**: Informazioni generali sull'esecuzione (file di log e console)
+- **WARNING**: Avvisi su problemi non critici
+- **ERROR**: Errori che impediscono il completamento dell'operazione
+
+### Contenuto Log
+I log includono:
+- Timestamp di ogni operazione
+- File CSV selezionato e percorso
+- Numero di righe e colonne processate
+- Percorso del PDF generato
+- Errori e warning durante l'esecuzione
+- Dettagli sulla stampa (per gli script di stampa)

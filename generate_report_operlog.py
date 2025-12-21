@@ -20,6 +20,7 @@ import os
 import argparse
 import glob
 import re
+import logging
 from datetime import datetime
 
 try:
@@ -289,8 +290,38 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
         return False
 
 
+def setup_logging_recent_folder(recent_folder):
+    """Setup logging nella cartella più recente."""
+    # Crea logger
+    logger = logging.getLogger('operlog_report')
+    logger.setLevel(logging.DEBUG)
+    
+    # Rimuovi handler esistenti per evitare duplicati
+    logger.handlers.clear()
+    
+    # Handler per file nella cartella più recente
+    log_file = os.path.join(recent_folder, f"operlog_report_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Handler per console
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    
+    # Formatter
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    
+    # Aggiungi handler
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+
 def main():
-    # Setup logging per PyInstaller
+    # Setup logging per PyInstaller (fallback)
     setup_logging_for_pyinstaller('operlog_report')
     
     parser = argparse.ArgumentParser(description='Genera report PDF da file CSV OPERLOG')
@@ -308,11 +339,23 @@ def main():
         if not os.path.exists(csv_path):
             print(f"ERRORE: File CSV non trovato: {csv_path}", file=sys.stderr)
             sys.exit(1)
+        # Determina cartella più recente dal percorso CSV
+        csv_dir = os.path.dirname(os.path.abspath(csv_path))
+        recent_folder = csv_dir
     else:
         csv_path = find_csv_operlog()
         if not csv_path:
             print("ERRORE: Nessun file CSV OPERLOG trovato nelle cartelle DDMMYY", file=sys.stderr)
             sys.exit(1)
+        # Determina cartella più recente
+        csv_dir = os.path.dirname(os.path.abspath(csv_path))
+        recent_folder = csv_dir
+    
+    # Setup logging nella cartella più recente
+    logger = setup_logging_recent_folder(recent_folder)
+    logger.info("=== AVVIO GENERAZIONE REPORT OPERLOG ===")
+    logger.info(f"Directory di lavoro: {os.getcwd()}")
+    logger.info(f"Cartella più recente: {recent_folder}")
     
     print(f"File CSV selezionato: {csv_path}")
     
@@ -350,8 +393,10 @@ def main():
     
     if success:
         print(f"Report generato: {output_path}")
+        logger.info(f"=== REPORT GENERATO CON SUCCESSO: {output_path} ===")
         sys.exit(0)
     else:
+        logger.error("=== ERRORE DURANTE LA GENERAZIONE DEL REPORT ===")
         sys.exit(1)
 
 

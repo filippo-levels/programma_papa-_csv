@@ -18,14 +18,23 @@ from time import sleep
 from datetime import datetime
 
 
-def setup_logging():
+def setup_logging(recent_folder=None):
     """Configura il sistema di logging per file e console."""
     # Crea logger
     logger = logging.getLogger('pdf_printer')
     logger.setLevel(logging.DEBUG)
     
-    # Handler per file
-    log_file = f"pdf_print_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    # Rimuovi handler esistenti per evitare duplicati
+    logger.handlers.clear()
+    
+    # Determina directory per il log file
+    if recent_folder and os.path.exists(recent_folder):
+        log_dir = recent_folder
+    else:
+        log_dir = os.getcwd()
+    
+    # Handler per file nella cartella più recente o directory corrente
+    log_file = os.path.join(log_dir, f"pdf_print_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)
     
@@ -197,10 +206,31 @@ def print_pdf_windows(pdf_path, logger=None):
 
 
 def main():
-    # Setup logging
-    logger = setup_logging()
+    # Prima trova la cartella più recente per setup logging
+    base_directory = "."
+    date_dirs = []
+    try:
+        for item in os.listdir(base_directory):
+            item_path = os.path.join(base_directory, item)
+            if os.path.isdir(item_path):
+                parsed_date = parse_directory_date(item)
+                if parsed_date:
+                    date_dirs.append((parsed_date, item_path))
+    except Exception:
+        pass
+    
+    # Determina cartella più recente
+    recent_folder = None
+    if date_dirs:
+        date_dirs.sort(key=lambda x: x[0], reverse=True)
+        recent_folder = date_dirs[0][1]
+    
+    # Setup logging nella cartella più recente
+    logger = setup_logging(recent_folder=recent_folder)
     logger.info("=== AVVIO STAMPA PDF ===")
     logger.info(f"Directory di lavoro: {os.getcwd()}")
+    if recent_folder:
+        logger.info(f"Cartella più recente per log: {recent_folder}")
     
     try:
         # Cerca il PDF più recente nella cartella DDMMYY più recente

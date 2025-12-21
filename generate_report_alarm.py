@@ -17,7 +17,9 @@ import sys
 import os
 import argparse
 import glob
+import logging
 from pathlib import Path
+from datetime import datetime
 import warnings
 
 try:
@@ -206,8 +208,47 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
         return False
 
 
+def setup_logging_pdf_folder():
+    """Setup logging nella cartella PDF."""
+    # Crea cartella PDF se non esiste
+    pdf_dir = os.path.join(os.getcwd(), "PDF")
+    os.makedirs(pdf_dir, exist_ok=True)
+    
+    # Crea logger
+    logger = logging.getLogger('alarm_report')
+    logger.setLevel(logging.DEBUG)
+    
+    # Rimuovi handler esistenti per evitare duplicati
+    logger.handlers.clear()
+    
+    # Handler per file nella cartella PDF
+    log_file = os.path.join(pdf_dir, f"alarm_report_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Handler per console
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    
+    # Formatter
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    
+    # Aggiungi handler
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+
 def main():
-    # Setup logging per PyInstaller
+    # Setup logging nella cartella PDF
+    logger = setup_logging_pdf_folder()
+    logger.info("=== AVVIO GENERAZIONE REPORT ALARM ===")
+    logger.info(f"Directory di lavoro: {os.getcwd()}")
+    
+    # Setup logging per PyInstaller (fallback)
     setup_logging_for_pyinstaller('alarm_report')
     
     parser = argparse.ArgumentParser(description='Genera report PDF da file CSV ALARM')
@@ -250,12 +291,19 @@ def main():
         print(df.head())
         return
     
+    # Crea cartella PDF se non esiste
+    pdf_dir = os.path.join(os.getcwd(), "PDF")
+    os.makedirs(pdf_dir, exist_ok=True)
+    logger.info(f"Cartella PDF: {pdf_dir}")
+    
     # Determina output path
     if args.out:
         output_path = args.out
     else:
         base_name = Path(csv_path).stem
-        output_path = f"{base_name}_report.pdf"
+        output_path = os.path.join(pdf_dir, f"{base_name}_report.pdf")
+    
+    logger.info(f"Percorso PDF output: {output_path}")
     
     # Logo path
     logo_path = get_logo_path(args.logo)
@@ -265,8 +313,10 @@ def main():
     
     if success:
         print(f"Report generato: {output_path}")
+        logger.info(f"=== REPORT GENERATO CON SUCCESSO: {output_path} ===")
         sys.exit(0)
     else:
+        logger.error("=== ERRORE DURANTE LA GENERAZIONE DEL REPORT ===")
         sys.exit(1)
 
 

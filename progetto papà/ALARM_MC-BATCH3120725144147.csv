@@ -1,0 +1,10 @@
+12e746771ddc82831e4db2efc9ef66af3a6fee4c02226d66604cb0cd734dce1f
+FileVersion	"2.1"
+EcoStruxureOperatorTerminalExpert	"3.5.100"
+Date	Time	Alarm Message	Alarm Status	Alarm Type	Condition	Deadband	Target Variable	Group Name	Value	Equipment Name	Alarm Severity
+"07/12/2025"	"11:52:18"	"SYS00034:Unable to export to the specified destination folder."	"Active"	"'-"	-	-	-	SystemErrorGroup	-	-	-
+"07/12/2025"	"11:55:15"	"ALARM LOW TEMPERATURE AIR IN"	"Active"	"Hi"	1	-	TIAPortalEquipment1.MB.B_ALL_LO_TEMP_AIR_IN	ALLARMI_IMPIANTO	1	TIAPortalEquipment1	1
+"07/12/2025"	"11:55:26"	"ALARM LOW TEMPERATURE AIR IN"	"Ack"	"Hi"	1	-	TIAPortalEquipment1.MB.B_ALL_LO_TEMP_AIR_IN	ALLARMI_IMPIANTO	1	TIAPortalEquipment1	1
+"07/12/2025"	"11:55:33"	"ALARM LOW TEMPERATURE AIR IN"	"Return"	"Hi"	1	-	TIAPortalEquipment1.MB.B_ALL_LO_TEMP_AIR_IN	ALLARMI_IMPIANTO	0	TIAPortalEquipment1	1
+"07/12/2025"	"11:56:32"	"ALARM HIGH TEMPERATURE PRODUCT 2"	"Active"	"Hi"	1	-	TIAPortalEquipment1.MB.B_ALL_HI_TEMP_PRODUCT_2	ALLARMI_IMPIANTO	1	TIAPortalEquipment1	1
+"07/12/2025"	"11:56:40"	"ALARM HIGH TEMPERATURE PRODUCT 2"	"Return"	"Hi"	1	-	TIAPortalEquipment1.MB.B_ALL_HI_TEMP_PRODUCT_2	ALLARMI_IMPIANTO	0	TIAPortalEquipment1	1

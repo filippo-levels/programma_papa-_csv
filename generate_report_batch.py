@@ -17,7 +17,9 @@ import sys
 import os
 import argparse
 import glob
+import logging
 from pathlib import Path
+from datetime import datetime
 import tempfile
 
 try:
@@ -28,7 +30,7 @@ except ImportError:
 
 try:
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.platypus import SimpleDocTemplate, Table, Paragraph, Spacer, PageBreak, Image
+    from reportlab.platypus import SimpleDocTemplate, BaseDocTemplate, PageTemplate, NextPageTemplate, Table, Paragraph, Spacer, PageBreak, Image, Frame
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import cm
     from reportlab.lib.enums import TA_CENTER
@@ -278,19 +280,76 @@ def create_temperature_chart(df, output_path=None):
         return None
 
 
+def add_page_number_landscape(canvas, doc):
+    """Aggiunge numerazione pagine per pagina landscape."""
+    page_num = canvas.getPageNumber()
+    text = f"Page {page_num}"
+    canvas.drawRightString(landscape(A4)[0] - 2*cm, 1*cm, text)
+
+
 def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_cols=None):
     """Genera il report PDF."""
     print(f"Generazione PDF: {output_path}")
     
-    # Setup documento principale (portrait)
-    doc = SimpleDocTemplate(
-        output_path,
-        pagesize=A4,
-        leftMargin=2*cm,
-        rightMargin=2*cm,
-        topMargin=1.5*cm,
-        bottomMargin=1.5*cm
-    )
+    # Prepara grafico se disponibile
+    chart_buffer = None
+    if HAS_MATPLOTLIB and len(df) > 0:
+        chart_buffer = create_temperature_chart(df)
+    
+    # Se c'è un grafico, usa BaseDocTemplate per gestire pagine miste
+    # Altrimenti usa SimpleDocTemplate (più semplice)
+    if chart_buffer:
+        # Setup documento con BaseDocTemplate per supportare pagine miste
+        doc = BaseDocTemplate(
+            output_path,
+            pagesize=A4,
+            leftMargin=2*cm,
+            rightMargin=2*cm,
+            topMargin=1.5*cm,
+            bottomMargin=1.5*cm
+        )
+        
+        # Frame per pagine portrait
+        portrait_frame = Frame(
+            doc.leftMargin, doc.bottomMargin,
+            doc.width, doc.height,
+            id='portrait'
+        )
+        
+        # Frame per pagine landscape
+        landscape_frame = Frame(
+            doc.leftMargin, doc.bottomMargin,
+            landscape(A4)[0] - 2*doc.leftMargin, landscape(A4)[1] - doc.topMargin - doc.bottomMargin,
+            id='landscape'
+        )
+        
+        # PageTemplate per portrait
+        portrait_template = PageTemplate(
+            id='portrait',
+            frames=[portrait_frame],
+            onPage=add_page_number,
+            pagesize=A4
+        )
+        
+        # PageTemplate per landscape
+        landscape_template = PageTemplate(
+            id='landscape',
+            frames=[landscape_frame],
+            onPage=add_page_number_landscape,
+            pagesize=landscape(A4)
+        )
+        
+        doc.addPageTemplates([portrait_template, landscape_template])
+    else:
+        # Setup documento semplice (portrait)
+        doc = SimpleDocTemplate(
+            output_path,
+            pagesize=A4,
+            leftMargin=2*cm,
+            rightMargin=2*cm,
+            topMargin=1.5*cm,
+            bottomMargin=1.5*cm
+        )
     
     # Stili comuni e sottotitolo specifico per batch
     styles, title_style, cell_style, header_style = get_common_styles()
@@ -409,25 +468,32 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
         
         story.append(table)
     
-        # Aggiungi grafico delle temperature se disponibile
-        if HAS_MATPLOTLIB and len(df) > 0:
-            chart_buffer = create_temperature_chart(df)
-            if chart_buffer:
-                # Aggiungi pagina nuova per il grafico
-                story.append(PageBreak())
-                
-                # Titolo per la sezione grafico
-                chart_title = Paragraph("Temperature Trend Over Time", title_style)
-                story.append(chart_title)
-                story.append(Spacer(1, 12))
-                
-                # Aggiungi il grafico temperature trend (dimensioni ottimizzate per portrait)
-                chart_image = Image(chart_buffer, width=16*cm, height=10*cm)
-                story.append(chart_image)
+    # Se c'è un grafico, aggiungilo alla story con PageTemplate landscape
+    if chart_buffer:
+        # Cambia al template landscape per questa pagina
+        if isinstance(doc, BaseDocTemplate):
+            # Usa NextPageTemplate per cambiare template
+            story.append(NextPageTemplate('landscape'))
+        
+        story.append(PageBreak())
+        
+        # Titolo per la sezione grafico
+        chart_title = Paragraph("Temperature Trend Over Time", title_style)
+        story.append(chart_title)
+        story.append(Spacer(1, 12))
+        
+        # Aggiungi il grafico temperature trend (dimensioni ottimizzate per landscape)
+        # In landscape A4: larghezza ~29.7cm, altezza ~21cm (meno margini)
+        # Usa dimensioni che sfruttano meglio lo spazio orizzontale
+        chart_image = Image(chart_buffer, width=25*cm, height=15*cm)
+        story.append(chart_image)
     
     # Genera PDF principale
     try:
-        doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
+        if isinstance(doc, BaseDocTemplate):
+            doc.build(story)
+        else:
+            doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
         print(f"PDF principale generato con successo")
         return True
     except Exception as e:
@@ -435,8 +501,47 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
         return False
 
 
+def setup_logging_pdf_folder():
+    """Setup logging nella cartella PDF."""
+    # Crea cartella PDF se non esiste
+    pdf_dir = os.path.join(os.getcwd(), "PDF")
+    os.makedirs(pdf_dir, exist_ok=True)
+    
+    # Crea logger
+    logger = logging.getLogger('batch_report')
+    logger.setLevel(logging.DEBUG)
+    
+    # Rimuovi handler esistenti per evitare duplicati
+    logger.handlers.clear()
+    
+    # Handler per file nella cartella PDF
+    log_file = os.path.join(pdf_dir, f"batch_report_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Handler per console
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    
+    # Formatter
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    
+    # Aggiungi handler
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+
 def main():
-    # Setup logging per PyInstaller
+    # Setup logging nella cartella PDF
+    logger = setup_logging_pdf_folder()
+    logger.info("=== AVVIO GENERAZIONE REPORT BATCH ===")
+    logger.info(f"Directory di lavoro: {os.getcwd()}")
+    
+    # Setup logging per PyInstaller (fallback)
     setup_logging_for_pyinstaller('batch_report')
     
     parser = argparse.ArgumentParser(description='Genera report PDF da file CSV BATCH')
@@ -483,21 +588,30 @@ def main():
     # Logo path
     logo_path = get_logo_path(args.logo)
     
+    # Crea cartella PDF se non esiste
+    pdf_dir = os.path.join(os.getcwd(), "PDF")
+    os.makedirs(pdf_dir, exist_ok=True)
+    logger.info(f"Cartella PDF: {pdf_dir}")
+    
     # Output path
     if args.out:
         output_path = args.out
     else:
         base_name = Path(csv_path).stem
-        output_path = f"{base_name}_report.pdf"
+        output_path = os.path.join(pdf_dir, f"{base_name}_report.pdf")
+    
+    logger.info(f"Percorso PDF output: {output_path}")
     
     # Genera PDF report
     success = create_pdf_report(df, output_path, csv_path, logo_path, missing_cols)
     
     if success:
         print(f"✅ PDF report generato: {output_path}")
+        logger.info(f"=== REPORT GENERATO CON SUCCESSO: {output_path} ===")
         sys.exit(0)
     else:
         print("❌ Errore generazione PDF report")
+        logger.error("=== ERRORE DURANTE LA GENERAZIONE DEL REPORT ===")
         sys.exit(1)
 
 
