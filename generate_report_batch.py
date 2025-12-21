@@ -194,6 +194,22 @@ def calculate_period(df):
     return "Period not determinable"
 
 
+def add_page_number_rotated(canvas, doc):
+    """Aggiunge numerazione pagine per pagina con contenuto ruotato (solo numero)."""
+    page_num = canvas.getPageNumber()
+    text = str(page_num)  # Solo il numero, senza "Page"
+    
+    canvas.saveState()
+    # Ruota di 90 gradi in senso antiorario
+    canvas.rotate(90)
+    # Dopo rotazione: x diventa y, y diventa -x
+    # Per posizionare in basso a destra della pagina ruotata:
+    # - In coordinate ruotate, "destra" è verso l'alto della pagina originale
+    # - "basso" è verso destra della pagina originale
+    canvas.drawRightString(A4[1] - 2*cm, -A4[0] + 1*cm, text)
+    canvas.restoreState()
+
+
 def create_temperature_chart(df, output_path=None):
     """Crea un grafico dell'andamento delle temperature nel tempo."""
     if not HAS_MATPLOTLIB:
@@ -280,18 +296,6 @@ def create_temperature_chart(df, output_path=None):
         return None
 
 
-def add_page_number_rotated(canvas, doc):
-    """Aggiunge numerazione pagine per pagina con contenuto ruotato (solo numero)."""
-    page_num = canvas.getPageNumber()
-    text = str(page_num)  # Solo il numero, senza "Page"
-    # Per pagina ruotata: ruota il canvas, disegna il numero, poi ripristina
-    canvas.saveState()
-    # Ruota di 90 gradi in senso antiorario
-    canvas.rotate(90)
-    # Trasla per posizionare il numero di pagina in basso a destra
-    # Dopo rotazione: x diventa y, y diventa -x
-    canvas.drawRightString(A4[1] - 1*cm, -A4[0] + 2*cm, text)
-    canvas.restoreState()
 
 
 def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_cols=None):
@@ -475,74 +479,34 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
     
     # Genera PDF principale
     try:
-        # Callback per ruotare il contenuto dell'ultima pagina (grafico + titolo)
-        # Usiamo una classe per tracciare quando siamo sulla pagina del grafico
-        class RotatedPageHandler:
-            """Handler per ruotare l'ultima pagina se contiene il grafico."""
+        # Callback per gestire la numerazione delle pagine
+        # Usiamo una classe per tracciare il numero totale di pagine
+        class PageNumberHandler:
+            """Handler per numerare le pagine correttamente."""
             def __init__(self, has_chart):
                 self.has_chart = has_chart
-                self.chart_page_detected = False
+                self.total_pages = None
             
             def on_page(self, canvas, doc):
                 page_num = canvas.getPageNumber()
                 
-                # Se c'è un grafico, dobbiamo ruotare la pagina che lo contiene
-                # La pagina del grafico è quella dopo tutte le pagine dati
-                # Per semplicità, ruotiamo tutte le pagine dopo la prima se c'è un grafico
+                # Calcola il numero totale di pagine al primo passaggio
+                if self.total_pages is None:
+                    # Durante il primo build, non sappiamo ancora il totale
+                    # Useremo un secondo passaggio per questo
+                    pass
+                
+                # Se c'è un grafico e siamo sull'ultima pagina
                 if self.has_chart and page_num > 1:
-                    # Questa è probabilmente la pagina con il grafico
-                    if not self.chart_page_detected:
-                        self.chart_page_detected = True
-                        
-                        # Salva lo stato del canvas
-                        canvas.saveState()
-                        
-                        # Ruota il canvas di 90 gradi in senso antiorario
-                        # Questo ruoterà tutto il contenuto della pagina
-                        canvas.rotate(90)
-                        
-                        # Trasla per centrare il contenuto ruotato
-                        # Dopo rotazione di 90 gradi antiorario:
-                        # - L'origine si sposta
-                        # - Per centrare: trasla di (altezza_pagina, 0)
-                        translate_x = A4[1]  # Altezza pagina (21cm)
-                        translate_y = 0
-                        canvas.translate(translate_x, translate_y)
-                        
-                        # Ripristina lo stato (il contenuto verrà disegnato con la trasformazione)
-                        # NOTA: Questo approccio funziona solo se il contenuto viene disegnato
-                        # DOPO questa callback, ma in realtà viene disegnato PRIMA!
-                        # Dobbiamo quindi ruotare il contenuto PRIMA di aggiungerlo alla story.
-                        canvas.restoreState()
-                        
-                        # Aggiungi numerazione pagine ruotata
-                        add_page_number_rotated(canvas, doc)
-                    else:
-                        add_page_number_rotated(canvas, doc)
+                    # L'ultima pagina (con il grafico) ha solo il numero ruotato
+                    add_page_number_rotated(canvas, doc)
                 else:
-                    # Pagine normali senza rotazione
-                    add_page_number(canvas, doc)
-        
-        # NOTA: L'approccio con canvas.rotate() nella callback onPage non funziona
-        # perché il contenuto viene disegnato PRIMA della callback.
-        # La soluzione è ruotare l'immagine PRIMA di aggiungerla alla story (già fatto sopra).
-        # Per ruotare anche il titolo, dobbiamo usare un approccio diverso.
-        # Per ora, ruotiamo solo l'immagine del grafico usando PIL.
-        # Se PIL non è disponibile, il grafico non sarà ruotato.
+                    # Tutte le altre pagine hanno "Page N"
+                    add_page_number(canvas, doc, show_page_text=True)
         
         # Genera PDF
-        if has_chart:
-            # Se abbiamo ruotato l'immagine con PIL, il contenuto è già ruotato
-            # Ma dobbiamo ancora ruotare il titolo. Per semplicità, ruotiamo tutto usando canvas.
-            # Ma questo richiede che il contenuto venga disegnato dopo la callback, il che non è possibile.
-            # Soluzione: ruotiamo tutto il contenuto della pagina usando una trasformazione del canvas
-            # che viene applicata PRIMA del disegno. Ma SimpleDocTemplate non supporta questo direttamente.
-            # Usiamo un approccio: ruotiamo solo l'immagine (già fatto) e lasciamo il titolo normale.
-            # Oppure, ruotiamo anche il titolo creando un'immagine del titolo ruotato.
-            handler = RotatedPageHandler(has_chart)
-            doc.build(story, onFirstPage=handler.on_page, onLaterPages=handler.on_page)
-        else:
-            doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
+        handler = PageNumberHandler(has_chart)
+        doc.build(story, onFirstPage=handler.on_page, onLaterPages=handler.on_page)
         
         print(f"PDF principale generato con successo")
         return True
