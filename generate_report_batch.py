@@ -317,13 +317,40 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
         )
         
         # Frame per pagine landscape
+        # In landscape: width e height sono invertiti rispetto a portrait
+        # landscape(A4) restituisce (larghezza, altezza) = (29.7cm, 21cm)
+        landscape_page_size = landscape(A4)
+        landscape_width = landscape_page_size[0]  # ~29.7cm (larghezza pagina landscape)
+        landscape_height = landscape_page_size[1]  # ~21cm (altezza pagina landscape)
+        
+        # Calcola il frame landscape con le dimensioni corrette
+        # IMPORTANTE: Per landscape, il frame deve essere calcolato con:
+        # - x: leftMargin (stesso di portrait)
+        # - y: bottomMargin (stesso di portrait)  
+        # - width: landscape_width - 2*leftMargin (larghezza disponibile)
+        # - height: landscape_height - topMargin - bottomMargin (altezza disponibile)
         landscape_frame = Frame(
-            doc.leftMargin, doc.bottomMargin,
-            landscape(A4)[0] - 2*doc.leftMargin, landscape(A4)[1] - doc.topMargin - doc.bottomMargin,
-            id='landscape'
+            doc.leftMargin,                    # x: margine sinistro
+            doc.bottomMargin,                  # y: margine inferiore
+            landscape_width - 2*doc.leftMargin,  # width: larghezza disponibile
+            landscape_height - doc.topMargin - doc.bottomMargin,  # height: altezza disponibile
+            id='landscape',
+            leftPadding=0,
+            bottomPadding=0,
+            rightPadding=0,
+            topPadding=0
         )
         
-        # PageTemplate per portrait
+        # Callback per pagina landscape che gestisce correttamente la rotazione
+        def on_landscape_page(canvas, doc):
+            # IMPORTANTE: Imposta la dimensione della pagina PRIMA di qualsiasi operazione
+            # Questo assicura che la pagina sia correttamente orientata durante la stampa
+            # e previene problemi di stampa specchiata
+            canvas.setPageSize(landscape(A4))
+            # Aggiungi numerazione pagine
+            add_page_number_landscape(canvas, doc)
+        
+        # PageTemplate per portrait (deve essere il primo per essere il default)
         portrait_template = PageTemplate(
             id='portrait',
             frames=[portrait_frame],
@@ -331,14 +358,16 @@ def create_pdf_report(df, output_path, source_filename, logo_path=None, missing_
             pagesize=A4
         )
         
-        # PageTemplate per landscape
+        # PageTemplate per landscape con callback personalizzato
+        # IMPORTANTE: pagesize deve essere landscape(A4) per assicurare orientamento corretto
         landscape_template = PageTemplate(
             id='landscape',
             frames=[landscape_frame],
-            onPage=add_page_number_landscape,
+            onPage=on_landscape_page,
             pagesize=landscape(A4)
         )
         
+        # Aggiungi i template nell'ordine: portrait prima (default), poi landscape
         doc.addPageTemplates([portrait_template, landscape_template])
     else:
         # Setup documento semplice (portrait)
