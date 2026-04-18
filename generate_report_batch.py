@@ -144,7 +144,11 @@ def load_batch_data(filepath, limit_rows=None):
         # Crea datetime per sort e calcoli (prima della conversione formato)
         if 'Date' in df.columns and 'Time' in df.columns:
             try:
-                df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
+                df['DateTime'] = pd.to_datetime(
+                    df['Date'].astype(str).str.strip() + ' ' + df['Time'].astype(str).str.strip(),
+                    format='%d/%m/%y %H:%M:%S',
+                    errors='coerce'
+                )
                 # Ordina per datetime
                 df = df.sort_values('DateTime')
             except Exception as e:
