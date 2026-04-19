@@ -222,10 +222,21 @@ def get_logo_path(args_logo):
     """Determina il path del logo, gestendo PyInstaller bundled resources."""
     if args_logo:
         return args_logo
-    else:
-        # Try bundled logo first (for PyInstaller), then fallback to local
-        bundled_logo = get_resource_path("logo.png")
-        if os.path.exists(bundled_logo):
-            return bundled_logo
-        else:
-            return "logo.png" 
+
+    bundled_logo = get_resource_path("logo.png")
+    if os.path.exists(bundled_logo):
+        return bundled_logo
+
+    for candidate in ("logo.png", os.path.join("data", "logo.png")):
+        if os.path.exists(candidate):
+            return candidate
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    for candidate in (
+        os.path.join(script_dir, "logo.png"),
+        os.path.join(script_dir, "data", "logo.png"),
+    ):
+        if os.path.exists(candidate):
+            return candidate
+
+    return "logo.png"
