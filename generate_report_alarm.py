@@ -117,6 +117,18 @@ def load_alarm_data(filepath, limit_rows=None):
         if 'Alarm Status' in df.columns:
             df['Alarm Status'] = df['Alarm Status'].str.title()  # Active, Return, Ack
         
+        # Ordina per data/ora (formato italiano DD/MM/YY, dayfirst=True)
+        if 'Date' in df.columns and 'Time' in df.columns:
+            try:
+                dt_sort = pd.to_datetime(
+                    df['Date'] + ' ' + df['Time'],
+                    dayfirst=True,
+                    errors='coerce'
+                )
+                df = df.assign(_dt=dt_sort).sort_values('_dt').drop(columns='_dt')
+            except Exception as e:
+                print(f"WARNING: Errore parsing datetime: {e}", file=sys.stderr)
+
         # Converti formato date
         if 'Date' in df.columns:
             df['Date'] = df['Date'].apply(convert_date_format)

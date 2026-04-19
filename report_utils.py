@@ -43,18 +43,20 @@ def get_resource_path(relative_path):
 
 
 def convert_date_format(date_str):
-    """Converte formato data da MM/DD/YYYY a DD/MM/YY."""
+    """Normalizza formato data italiano DD/MM/YY (o DD/MM/YYYY) → DD/MM/YY."""
     try:
         if pd.isna(date_str) or date_str == '' or str(date_str).strip() == '':
             return date_str
-        
+
         date_str = str(date_str).strip()
-        # Parse MM/DD/YYYY
-        dt = datetime.strptime(date_str, '%m/%d/%Y')
-        # Return DD/MM/YY
-        return dt.strftime('%d/%m/%y')
-    except:
-        # Se il parsing fallisce, ritorna il valore originale
+        for fmt in ('%d/%m/%y', '%d/%m/%Y'):
+            try:
+                dt = datetime.strptime(date_str, fmt)
+                return dt.strftime('%d/%m/%y')
+            except ValueError:
+                continue
+        return date_str
+    except Exception:
         return date_str
 
 
