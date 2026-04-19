@@ -273,9 +273,12 @@ def create_temperature_chart(df, output_path=None):
         ax.set_title('Temperature Trend Over Time', fontsize=14, fontweight='bold')
         
         # Formatta l'asse X per mostrare le date/ore
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=max(1, len(valid_data)//10)))
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        # Limita il numero di tick per evitare sovrapposizioni e usa rotazione obliqua
+        locator = mdates.AutoDateLocator(minticks=15, maxticks=20)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=30, ha='right',
+                 rotation_mode='anchor', fontsize=9)
         
         # Aggiungi griglia
         ax.grid(True, alpha=0.3)
